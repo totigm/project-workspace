@@ -1,6 +1,8 @@
+import { ProjectStatus } from "@prisma/client";
 import { DEFAULT_USER_ID, requireCurrentUser } from "@/lib/current-user";
-import { listProjectsForUser } from "@/lib/projects";
+import { FREE_PROJECT_LIMIT, listProjectsForUser } from "@/lib/projects";
 import { CreateProjectForm } from "@/app/create-project-form";
+import { ProjectList } from "@/app/project-list";
 
 type HomeProps = {
   searchParams?: Promise<{
@@ -17,6 +19,16 @@ export default async function Home({ searchParams }: HomeProps) {
     requireCurrentUser(userId),
     listProjectsForUser(userId)
   ]);
+
+  // Only live (non-archived) projects count toward the plan limit.
+  const activeCount = projects.filter(
+    (project) => project.status !== ProjectStatus.ARCHIVED
+  ).length;
+  const slimProjects = projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    status: project.status
+  }));
 
   return (
     <main className="shell">
@@ -47,30 +59,14 @@ export default async function Home({ searchParams }: HomeProps) {
         </div>
       </section>
 
-      <CreateProjectForm userId={userId} />
+      <CreateProjectForm
+        userId={userId}
+        plan={currentUser.organization.plan}
+        projectCount={activeCount}
+        freeLimit={FREE_PROJECT_LIMIT}
+      />
 
-      <section className="project-list" aria-label="Projects">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Project</th>
-              <th scope="col">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((project) => (
-              <tr key={project.id}>
-                <td>{project.name}</td>
-                <td>
-                  <span className={`status status-${project.status.toLowerCase()}`}>
-                    {project.status.toLowerCase()}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+      <ProjectList userId={userId} projects={slimProjects} />
     </main>
   );
 }

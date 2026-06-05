@@ -108,6 +108,61 @@ describe("project creation", () => {
     expect(response.status).toBe(400);
     expect(body.error).toBe("Project name is required.");
   });
+
+  it("allows free orgs to reach the 3 project limit", async () => {
+    // Fixture starts with 2 projects; the 3rd should still be allowed.
+    const response = await requestCreateProject(fixture.user, {
+      name: "Third Project"
+    });
+
+    expect(response.status).toBe(201);
+  });
+
+  it("blocks free orgs from exceeding the 3 project limit", async () => {
+    await requestCreateProject(fixture.user, { name: "Third Project" });
+
+    const response = await requestCreateProject(fixture.user, {
+      name: "Fourth Project"
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(403);
+    expect(body.error).toMatch(/limited to 3 active projects/);
+  });
+
+  it("does not count archived projects toward the free limit", async () => {
+    // Fixture has 2 live projects. Adding an archived one leaves the live count
+    // at 2, so one more create is still allowed before the limit kicks in.
+    await prisma.project.create({
+      data: {
+        id: "test-create-archived",
+        name: "Archived One",
+        status: ProjectStatus.ARCHIVED,
+        organizationId: fixture.org
+      }
+    });
+
+    const third = await requestCreateProject(fixture.user, { name: "Third Active" });
+    expect(third.status).toBe(201);
+
+    // Live count is now 3 (2 original + 1 new); the archived one is ignored.
+    const fourth = await requestCreateProject(fixture.user, { name: "Fourth Active" });
+    expect(fourth.status).toBe(403);
+  });
+
+  it("lets pro orgs create beyond the free limit", async () => {
+    await prisma.organization.update({
+      where: { id: fixture.org },
+      data: { plan: BillingPlan.PRO }
+    });
+
+    await requestCreateProject(fixture.user, { name: "Third Project" });
+    const response = await requestCreateProject(fixture.user, {
+      name: "Fourth Project"
+    });
+
+    expect(response.status).toBe(201);
+  });
 });
 
 function requestCreateProject(userId: string, body: Record<string, unknown>) {
