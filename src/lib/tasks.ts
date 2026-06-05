@@ -186,3 +186,37 @@ export async function moveTaskForUser(userId: string, taskId: string, input: Mov
 
 // Exported for the API route discriminator + later tasks.
 export { requireOwnedTask };
+
+type EditTaskInput = {
+  title?: unknown;
+  description?: unknown;
+  dueDate?: unknown;
+};
+
+export async function editTaskForUser(userId: string, taskId: string, input: EditTaskInput) {
+  const task = await requireOwnedTask(userId, taskId);
+
+  if (task.project.status === ProjectStatus.ARCHIVED) {
+    throw new InvalidTaskInputError("Archived projects are read-only.");
+  }
+
+  // Only update fields that were provided; "" clears description/dueDate.
+  const data: { title?: string; description?: string | null; dueDate?: Date | null } = {};
+  if (input.title !== undefined) {
+    data.title = parseTitle(input.title);
+  }
+  if (input.description !== undefined) {
+    data.description = parseDescription(input.description);
+  }
+  if (input.dueDate !== undefined) {
+    data.dueDate = parseDueDate(input.dueDate);
+  }
+
+  return prisma.task.update({ where: { id: taskId }, data });
+}
+
+export async function deleteTaskForUser(userId: string, taskId: string) {
+  const task = await requireOwnedTask(userId, taskId);
+  await prisma.task.delete({ where: { id: taskId } });
+  return task;
+}
