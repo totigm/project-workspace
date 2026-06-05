@@ -1,6 +1,8 @@
 "use client";
 
+import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 type UpgradeModalProps = {
   open: boolean;
@@ -10,74 +12,56 @@ type UpgradeModalProps = {
   onUpgrade?: () => void;
 };
 
-const EXIT_MS = 260;
+const PERKS = ["Unlimited active projects", "No archiving to make room", "Priority support"];
+
+const container: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.05, delayChildren: 0.08 } }
+};
+
+const item: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.36, ease: [0.22, 1, 0.36, 1] } }
+};
 
 export function UpgradeModal({ open, used, limit, onClose, onUpgrade }: UpgradeModalProps) {
-  // `mounted` keeps the node in the tree long enough to play the exit animation;
-  // `visible` is the flag the CSS transitions actually key off of.
-  const [mounted, setMounted] = useState(open);
-  const [visible, setVisible] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
+  // Scroll lock + focus management while open.
   useEffect(() => {
-    if (open) {
-      previouslyFocused.current = document.activeElement as HTMLElement | null;
-      setMounted(true);
-      // Two frames so the browser paints the initial (hidden) state before we
-      // flip to visible — otherwise the enter transition is skipped.
-      const raf = requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)));
-      return () => cancelAnimationFrame(raf);
-    }
-
-    if (mounted) {
-      setVisible(false);
-      const timer = setTimeout(() => setMounted(false), EXIT_MS);
-      return () => clearTimeout(timer);
-    }
-  }, [open, mounted]);
-
-  // Lock background scroll, move focus in, and restore it on close.
-  useEffect(() => {
-    if (!visible) {
-      return;
-    }
-
+    if (!open) return;
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
     const { overflow } = document.body.style;
     document.body.style.overflow = "hidden";
-    cardRef.current?.querySelector<HTMLButtonElement>("[data-autofocus]")?.focus();
+    const focusTimer = window.setTimeout(() => {
+      cardRef.current?.querySelector<HTMLButtonElement>("[data-autofocus]")?.focus();
+    }, 80);
 
     return () => {
       document.body.style.overflow = overflow;
+      window.clearTimeout(focusTimer);
       previouslyFocused.current?.focus?.();
     };
-  }, [visible]);
+  }, [open]);
 
+  // ESC to close + focus trap.
   useEffect(() => {
-    if (!mounted) {
-      return;
-    }
-
+    if (!open) return;
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         onClose();
         return;
       }
-
-      if (event.key !== "Tab" || !cardRef.current) {
-        return;
-      }
-
+      if (event.key !== "Tab" || !cardRef.current) return;
       const focusable = cardRef.current.querySelectorAll<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       );
-      if (focusable.length === 0) {
-        return;
-      }
-
+      if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
@@ -86,100 +70,147 @@ export function UpgradeModal({ open, used, limit, onClose, onUpgrade }: UpgradeM
         first.focus();
       }
     }
-
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [mounted, onClose]);
+  }, [open, onClose]);
 
-  if (!mounted) {
-    return null;
-  }
-
+  if (!mounted) return null;
   const fillPct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 100;
 
-  return (
-    <div
-      className="upgrade-overlay"
-      data-visible={visible}
-      role="presentation"
-      onClick={onClose}
-    >
-      <div
-        className="upgrade-card"
-        data-visible={visible}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="upgrade-title"
-        aria-describedby="upgrade-desc"
-        ref={cardRef}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <span className="upgrade-grip" aria-hidden="true" />
-
-        <button className="upgrade-close" type="button" aria-label="Dismiss" onClick={onClose}>
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-            <path
-              d="M6 6l12 12M18 6L6 18"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
-
-        <span className="upgrade-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="26" height="26">
-            <path
-              d="M12 3l2.4 5 5.6.6-4 3.9 1 5.5-5-2.7-5 2.7 1-5.5-4-3.9 5.6-.6L12 3z"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
-
-        <p className="upgrade-eyebrow">Free plan</p>
-        <h2 id="upgrade-title">You&rsquo;ve reached your project limit</h2>
-        <p id="upgrade-desc" className="upgrade-desc">
-          Free workspaces can hold up to {limit} projects. Upgrade to Pro for unlimited
-          projects, so your team never has to archive good work to make room.
-        </p>
-
-        <div className="upgrade-meter">
-          <div
-            className="upgrade-meter-track"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={limit}
-            aria-valuenow={used}
-            aria-label={`${used} of ${limit} projects used`}
+  return createPortal(
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          className="fixed inset-0 z-[1000] flex items-end justify-center sm:items-center sm:p-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={onClose}
+          role="presentation"
+          style={{ background: "rgba(6, 8, 12, 0.62)", backdropFilter: "blur(6px)" }}
+        >
+          <motion.div
+            ref={cardRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="upgrade-title"
+            aria-describedby="upgrade-desc"
+            onClick={(event) => event.stopPropagation()}
+            initial={{ opacity: 0, y: 40, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.97, transition: { duration: 0.18 } }}
+            transition={{ type: "spring", stiffness: 360, damping: 30 }}
+            className="panel relative w-full overflow-hidden rounded-b-none rounded-t-3xl px-7 pb-[calc(1.6rem+env(safe-area-inset-bottom))] pt-6 sm:w-[min(100%,448px)] sm:rounded-2xl sm:pb-7"
+            style={{ boxShadow: "var(--shadow-lg)" }}
           >
             <span
-              className="upgrade-meter-fill"
-              style={{ width: visible ? `${fillPct}%` : "0%" }}
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-10 -top-20 h-40"
+              style={{ background: "radial-gradient(60% 100% at 50% 0%, var(--accent-soft), transparent 70%)" }}
             />
-          </div>
-          <span className="upgrade-meter-label">
-            <strong>{used}</strong> of {limit} projects used
-          </span>
-        </div>
+            <span
+              aria-hidden="true"
+              className="mx-auto mb-5 block h-1 w-10 rounded-full bg-border-strong sm:hidden"
+            />
 
-        <div className="upgrade-actions">
-          <button
-            className="upgrade-primary"
-            type="button"
-            data-autofocus
-            onClick={onUpgrade ?? onClose}
-          >
-            Upgrade to Pro
-          </button>
-          <button className="upgrade-secondary" type="button" onClick={onClose}>
-            Maybe later
-          </button>
-        </div>
-      </div>
-    </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Dismiss"
+              className="absolute right-4 top-4 grid size-9 place-items-center rounded-full text-subtle transition-colors hover:bg-surface-2 hover:text-text"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            <motion.div variants={container} initial="hidden" animate="show">
+              <motion.span
+                variants={item}
+                className="grid size-14 place-items-center rounded-2xl text-[var(--accent-contrast)]"
+                style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))", boxShadow: "var(--shadow-glow)" }}
+                aria-hidden="true"
+              >
+                <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M13 2 4.5 13.2c-.4.5 0 1.3.6 1.3H11l-1 8 8.5-11.2c.4-.5 0-1.3-.6-1.3H12l1-8Z" fill="currentColor" />
+                </svg>
+              </motion.span>
+
+              <motion.p variants={item} className="mt-5 text-[0.72rem] font-bold uppercase tracking-[0.12em] text-accent-ink">
+                Free plan
+              </motion.p>
+              <motion.h2 variants={item} id="upgrade-title" className="mt-1.5 text-2xl font-extrabold tracking-tight text-text">
+                You&rsquo;ve hit your project limit
+              </motion.h2>
+              <motion.p variants={item} id="upgrade-desc" className="mt-2.5 text-[0.95rem] leading-relaxed text-muted">
+                Free workspaces hold up to {limit} active projects. Upgrade to Pro for unlimited
+                projects — never archive good work to make room again.
+              </motion.p>
+
+              <motion.div variants={item} className="mt-5">
+                <div
+                  className="h-2.5 overflow-hidden rounded-full bg-surface-3"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={limit}
+                  aria-valuenow={used}
+                  aria-label={`${used} of ${limit} projects used`}
+                >
+                  <motion.span
+                    className="block h-full rounded-full"
+                    style={{ background: "linear-gradient(90deg, var(--accent), var(--accent-2))" }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${fillPct}%` }}
+                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+                  />
+                </div>
+                <p className="mt-2 text-[0.8rem] font-semibold text-muted">
+                  <span className="tabular text-text">{used}</span> of {limit} projects used
+                </p>
+              </motion.div>
+
+              <motion.ul variants={item} className="mt-5 space-y-2">
+                {PERKS.map((perk) => (
+                  <li key={perk} className="flex items-center gap-2.5 text-sm text-text">
+                    <span
+                      className="grid size-5 place-items-center rounded-full"
+                      style={{ background: "var(--active-soft)", color: "var(--active)" }}
+                      aria-hidden="true"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24">
+                        <path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                    {perk}
+                  </li>
+                ))}
+              </motion.ul>
+
+              <motion.div variants={item} className="mt-6 flex flex-col gap-2.5">
+                <motion.button
+                  type="button"
+                  data-autofocus
+                  whileTap={{ scale: 0.98 }}
+                  onClick={onUpgrade ?? onClose}
+                  className="h-12 rounded-[var(--radius-md)] font-bold text-[var(--accent-contrast)] transition-[filter] hover:brightness-110"
+                  style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))", boxShadow: "var(--shadow-glow)" }}
+                >
+                  Upgrade to Pro
+                </motion.button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-11 rounded-[var(--radius-md)] font-semibold text-muted transition-colors hover:bg-surface-2 hover:text-text"
+                >
+                  Maybe later
+                </button>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    document.body
   );
 }
