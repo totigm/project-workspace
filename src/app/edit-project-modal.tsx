@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Modal } from "@/app/modal";
 import { Select, type SelectOption } from "@/app/select";
 import type { ClientProject } from "@/app/workspace";
@@ -29,6 +29,8 @@ export function EditProjectModal({ open, project, onClose, onSave }: EditProject
   const [status, setStatus] = useState("ACTIVE");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const keepEditingRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (project) {
@@ -36,10 +38,35 @@ export function EditProjectModal({ open, project, onClose, onSave }: EditProject
       setName(project.name);
       setStatus(project.status);
       setError(null);
+      setConfirmDiscard(false);
     }
   }, [project]);
 
+  // Move focus to the safe default ("Keep editing") when the discard prompt appears.
+  useEffect(() => {
+    if (confirmDiscard) {
+      keepEditingRef.current?.focus();
+    }
+  }, [confirmDiscard]);
+
+  const isDirty =
+    snapshot !== null && (name !== snapshot.name || status !== snapshot.status);
   const willArchive = status === "ARCHIVED" && snapshot?.status !== "ARCHIVED";
+
+  // Intercept every dismissal path (backdrop, Escape, ✕, Cancel): if there are
+  // unsaved edits, ask before throwing them away.
+  function requestClose() {
+    if (isDirty) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onClose();
+  }
+
+  function discard() {
+    setConfirmDiscard(false);
+    onClose();
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,7 +90,7 @@ export function EditProjectModal({ open, project, onClose, onSave }: EditProject
   }
 
   return (
-    <Modal open={open} onClose={onClose} labelledBy="edit-title">
+    <Modal open={open} onClose={requestClose} labelledBy="edit-title">
       <p className="text-[0.72rem] font-bold uppercase tracking-[0.12em] text-accent-ink">
         Edit project
       </p>
@@ -130,34 +157,64 @@ export function EditProjectModal({ open, project, onClose, onSave }: EditProject
           </p>
         ) : null}
 
-        <div className="mt-1 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-11 rounded-[var(--radius-md)] px-4 font-semibold text-muted transition-colors hover:bg-surface-2 hover:text-text"
+        {confirmDiscard ? (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            role="group"
+            aria-label="Discard unsaved changes"
+            className="mt-1 rounded-[var(--radius-md)] border border-border bg-surface-2 p-3.5"
           >
-            Cancel
-          </button>
-          <motion.button
-            type="submit"
-            disabled={isSaving}
-            whileTap={{ scale: 0.98 }}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-[var(--radius-md)] px-5 font-semibold text-[var(--accent-contrast)] shadow-[var(--shadow-glow)] transition-[filter,opacity] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))" }}
-          >
-            {isSaving ? (
-              <>
-                <svg className="motion-safe:animate-spin" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
-                  <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-                Saving…
-              </>
-            ) : (
-              "Save changes"
-            )}
-          </motion.button>
-        </div>
+            <p className="text-[0.88rem] font-semibold text-text">Discard your unsaved changes?</p>
+            <div className="mt-3 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+              <button
+                ref={keepEditingRef}
+                type="button"
+                onClick={() => setConfirmDiscard(false)}
+                className="h-10 rounded-[var(--radius-md)] px-4 text-sm font-semibold text-muted transition-colors hover:bg-surface-3 hover:text-text"
+              >
+                Keep editing
+              </button>
+              <button
+                type="button"
+                onClick={discard}
+                className="h-10 rounded-[var(--radius-md)] px-4 text-sm font-semibold transition-[filter] hover:brightness-110"
+                style={{ background: "var(--danger)", color: "#fff" }}
+              >
+                Discard
+              </button>
+            </div>
+          </motion.div>
+        ) : (
+          <div className="mt-1 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={requestClose}
+              className="h-11 rounded-[var(--radius-md)] px-4 font-semibold text-muted transition-colors hover:bg-surface-2 hover:text-text"
+            >
+              Cancel
+            </button>
+            <motion.button
+              type="submit"
+              disabled={isSaving}
+              whileTap={{ scale: 0.98 }}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-[var(--radius-md)] px-5 font-semibold text-[var(--accent-contrast)] shadow-[var(--shadow-glow)] transition-[filter,opacity] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))" }}
+            >
+              {isSaving ? (
+                <>
+                  <svg className="motion-safe:animate-spin" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
+                    <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                  Saving…
+                </>
+              ) : (
+                "Save changes"
+              )}
+            </motion.button>
+          </div>
+        )}
       </form>
     </Modal>
   );

@@ -24,6 +24,14 @@ export function Modal({ open, onClose, labelledBy, describedBy, children }: Moda
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  // Hold the latest onClose in a ref so the key handler can stay bound while the
+  // modal is open instead of re-subscribing every time the parent passes a new
+  // onClose identity (e.g. a fresh closure each render).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   // Scroll lock + focus management while open.
   useEffect(() => {
     if (!open) return;
@@ -46,12 +54,14 @@ export function Modal({ open, onClose, labelledBy, describedBy, children }: Moda
     if (!open) return;
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab" || !cardRef.current) return;
+      // Only currently-focusable controls — skip disabled ones so Tab never
+      // lands on, say, a disabled "Save" button mid-submit.
       const focusable = cardRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
       );
       if (focusable.length === 0) return;
       const first = focusable[0];
@@ -66,7 +76,7 @@ export function Modal({ open, onClose, labelledBy, describedBy, children }: Moda
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!mounted) return null;
 

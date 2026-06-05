@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { type KeyboardEvent, useMemo, useRef, useState } from "react";
 import { ProjectRow } from "@/app/project-row";
 import type { ClientProject } from "@/app/workspace";
 
@@ -53,19 +53,48 @@ export function ProjectsPanel({
   const hasAny = projects.length > 0;
   const isFiltered = filter !== "ALL" || query.trim() !== "";
 
+  // Roving-tabindex keyboard support for the filter group: it's a single tab
+  // stop, and arrow/Home/End move between filters, applying as they go.
+  const filterRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  function onFilterKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let next: number | null = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      next = (index + 1) % FILTERS.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      next = (index - 1 + FILTERS.length) % FILTERS.length;
+    } else if (event.key === "Home") {
+      next = 0;
+    } else if (event.key === "End") {
+      next = FILTERS.length - 1;
+    }
+    if (next === null) return;
+    event.preventDefault();
+    setFilter(FILTERS[next].key);
+    filterRefs.current[next]?.focus();
+  }
+
   return (
     <section aria-label="Projects" className="panel overflow-hidden">
       {/* Toolbar */}
       <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-        <div className="flex items-center gap-1 overflow-x-auto rounded-full border border-border bg-surface-2/60 p-1">
-          {FILTERS.map((f) => {
+        <div
+          role="group"
+          aria-label="Filter projects by status"
+          className="flex items-center gap-1 overflow-x-auto rounded-full border border-border bg-surface-2/60 p-1"
+        >
+          {FILTERS.map((f, index) => {
             const active = filter === f.key;
             return (
               <button
                 key={f.key}
                 type="button"
+                ref={(element) => {
+                  filterRefs.current[index] = element;
+                }}
                 onClick={() => setFilter(f.key)}
+                onKeyDown={(event) => onFilterKeyDown(event, index)}
                 aria-pressed={active}
+                tabIndex={active ? 0 : -1}
                 className="relative isolate shrink-0 rounded-full px-3 py-1.5 text-[0.82rem] font-semibold transition-colors"
                 style={{ color: active ? "var(--accent-contrast)" : "var(--text-muted)" }}
               >
