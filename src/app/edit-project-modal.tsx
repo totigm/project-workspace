@@ -1,32 +1,30 @@
 "use client";
 
-import { CSSProperties, FormEvent, useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { FormEvent, useEffect, useState } from "react";
 import { Modal } from "@/app/modal";
+import { Select, type SelectOption } from "@/app/select";
+import type { ClientProject } from "@/app/workspace";
 
-export type EditableProject = {
-  id: string;
-  name: string;
-  status: string;
-};
+export type SaveResult = "ok" | "error";
 
 type EditProjectModalProps = {
   open: boolean;
-  project: EditableProject | null;
-  userId: string;
+  project: ClientProject | null;
   onClose: () => void;
-  onSaved: () => void;
+  onSave: (id: string, name: string, status: string) => Promise<SaveResult>;
 };
 
-export function EditProjectModal({
-  open,
-  project,
-  userId,
-  onClose,
-  onSaved
-}: EditProjectModalProps) {
-  // Retain the last project so the content stays rendered during the exit
-  // animation, after `project` has been cleared by the parent.
-  const [snapshot, setSnapshot] = useState<EditableProject | null>(project);
+const STATUS_OPTIONS: SelectOption[] = [
+  { value: "ACTIVE", label: "Active", dot: "var(--active)" },
+  { value: "PAUSED", label: "Paused", dot: "var(--paused)" },
+  { value: "ARCHIVED", label: "Archive (permanent)", dot: "var(--archived)" }
+];
+
+export function EditProjectModal({ open, project, onClose, onSave }: EditProjectModalProps) {
+  // Retain the last project so content stays rendered during the exit animation,
+  // after the parent clears `project`.
+  const [snapshot, setSnapshot] = useState<ClientProject | null>(project);
   const [name, setName] = useState("");
   const [status, setStatus] = useState("ACTIVE");
   const [error, setError] = useState<string | null>(null);
@@ -41,110 +39,126 @@ export function EditProjectModal({
     }
   }, [project]);
 
+  const willArchive = status === "ARCHIVED" && snapshot?.status !== "ARCHIVED";
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!snapshot) {
+    if (!snapshot) return;
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Project name is required.");
       return;
     }
 
     setIsSaving(true);
     setError(null);
-
-    const response = await fetch(`/api/projects/${snapshot.id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-id": userId
-      },
-      body: JSON.stringify({ name, status })
-    });
-    const payload = (await response.json()) as { error?: string };
-
+    const result = await onSave(snapshot.id, trimmed, status);
     setIsSaving(false);
 
-    if (!response.ok) {
-      setError(payload.error ?? "Unable to save changes.");
-      return;
+    if (result === "ok") {
+      onClose();
+    } else {
+      setError("Unable to save changes. Please try again.");
     }
-
-    onSaved();
   }
-
-  const willArchive = status === "ARCHIVED" && snapshot?.status !== "ARCHIVED";
 
   return (
     <Modal open={open} onClose={onClose} labelledBy="edit-title">
-      <p className="upgrade-eyebrow stagger" style={stagger(0)}>
+      <p className="text-[0.72rem] font-bold uppercase tracking-[0.12em] text-accent-ink">
         Edit project
       </p>
-      <h2 id="edit-title" className="edit-heading stagger" style={stagger(1)}>
+      <h2 id="edit-title" className="mt-1.5 truncate text-2xl font-extrabold tracking-tight text-text">
         {snapshot?.name}
       </h2>
 
-      <form className="edit-form" onSubmit={onSubmit}>
-        <div className="stagger" style={stagger(2)}>
-          <label htmlFor="edit-name">Name</label>
+      <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-4">
+        <div>
+          <label htmlFor="edit-name" className="mb-1.5 block text-[0.72rem] font-bold uppercase tracking-wide text-subtle">
+            Name
+          </label>
           <input
             id="edit-name"
             name="name"
             data-autofocus
             type="text"
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            maxLength={80}
             placeholder="Project name"
+            aria-invalid={Boolean(error)}
+            onChange={(event) => {
+              setName(event.target.value);
+              if (error) setError(null);
+            }}
+            className="h-11 w-full rounded-[var(--radius-md)] border border-border bg-surface-2 px-3.5 text-text placeholder:text-subtle transition-[border-color,box-shadow] focus:border-accent-border focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
           />
         </div>
 
-        <div className="stagger" style={stagger(3)}>
-          <label htmlFor="edit-status">Status</label>
-          <select
+        <div>
+          <label id="edit-status-label" className="mb-1.5 block text-[0.72rem] font-bold uppercase tracking-wide text-subtle">
+            Status
+          </label>
+          <Select
             id="edit-status"
-            name="status"
+            ariaLabel="Project status"
             value={status}
-            onChange={(event) => setStatus(event.target.value)}
-          >
-            <option value="ACTIVE">Active</option>
-            <option value="PAUSED">Paused</option>
-            <option value="ARCHIVED">Archive (permanent)</option>
-          </select>
+            options={STATUS_OPTIONS}
+            onChange={setStatus}
+          />
         </div>
 
         {willArchive ? (
-          <p className="edit-warning stagger" style={stagger(4)} role="status">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-              <path
-                d="M12 3l9 16H3l9-16zM12 10v4M12 17.5v.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+          <motion.p
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            role="status"
+            className="flex items-start gap-2.5 rounded-[var(--radius-md)] px-3.5 py-3 text-[0.84rem] leading-snug"
+            style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
+          >
+            <svg className="mt-0.5 shrink-0" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M12 3l9 16H3l9-16zM12 10v4M12 17.5v.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Archiving is permanent &mdash; this project can&rsquo;t be reactivated, but it
-            frees a slot on your plan.
-          </p>
+            <span>
+              Archiving is permanent — this project can&rsquo;t be reactivated, but it frees a
+              slot on your plan.
+            </span>
+          </motion.p>
         ) : null}
 
         {error ? (
-          <p className="edit-error" role="alert">
+          <p role="alert" className="text-[0.84rem] font-medium" style={{ color: "var(--danger)" }}>
             {error}
           </p>
         ) : null}
 
-        <div className="modal-actions-row stagger" style={stagger(5)}>
-          <button className="btn-ghost" type="button" onClick={onClose}>
+        <div className="mt-1 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-11 rounded-[var(--radius-md)] px-4 font-semibold text-muted transition-colors hover:bg-surface-2 hover:text-text"
+          >
             Cancel
           </button>
-          <button className="btn-primary" type="submit" disabled={isSaving}>
-            {isSaving ? "Saving…" : "Save changes"}
-          </button>
+          <motion.button
+            type="submit"
+            disabled={isSaving}
+            whileTap={{ scale: 0.98 }}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-[var(--radius-md)] px-5 font-semibold text-[var(--accent-contrast)] shadow-[var(--shadow-glow)] transition-[filter,opacity] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))" }}
+          >
+            {isSaving ? (
+              <>
+                <svg className="motion-safe:animate-spin" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
+                  <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                Saving…
+              </>
+            ) : (
+              "Save changes"
+            )}
+          </motion.button>
         </div>
       </form>
     </Modal>
   );
-}
-
-function stagger(index: number): CSSProperties {
-  return { ["--i" as string]: index };
 }

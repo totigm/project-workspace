@@ -19,9 +19,16 @@ type ProjectsPanelProps = {
   busyIds: Set<string>;
   loading: boolean;
   onChangeStatus: (id: string, status: string) => void;
+  onEdit: (project: ClientProject) => void;
 };
 
-export function ProjectsPanel({ projects, busyIds, loading, onChangeStatus }: ProjectsPanelProps) {
+export function ProjectsPanel({
+  projects,
+  busyIds,
+  loading,
+  onChangeStatus,
+  onEdit
+}: ProjectsPanelProps) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query, setQuery] = useState("");
 
@@ -143,6 +150,7 @@ export function ProjectsPanel({ projects, busyIds, loading, onChangeStatus }: Pr
                 project={project}
                 busy={busyIds.has(project.id)}
                 onChangeStatus={onChangeStatus}
+                onEdit={onEdit}
               />
             ))}
           </AnimatePresence>

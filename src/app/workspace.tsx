@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { CreateProjectForm, type CreateResult } from "@/app/create-project-form";
+import { EditProjectModal, type SaveResult } from "@/app/edit-project-modal";
 import { ProjectsPanel } from "@/app/projects-panel";
 import { PlanPill, StatCard } from "@/app/stat-card";
 import { ThemeToggle } from "@/app/theme-toggle";
@@ -41,6 +42,7 @@ export function Workspace({
   const [projects, setProjects] = useState(initialProjects);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [editing, setEditing] = useState<ClientProject | null>(null);
   const [isSwitching, startSwitch] = useTransition();
 
   // Re-seed from the server when the active user changes (account switch).
@@ -165,6 +167,53 @@ export function Workspace({
     }
   }
 
+  // Full edit (rename + status) from the edit modal — optimistic, with revert.
+  async function saveProject(id: string, name: string, status: string): Promise<SaveResult> {
+    const target = projects.find((p) => p.id === id);
+    if (!target) return "error";
+    const previous = { name: target.name, status: target.status };
+    const archiving =
+      status.toUpperCase() === "ARCHIVED" && previous.status.toUpperCase() !== "ARCHIVED";
+
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name, status } : p)));
+    setBusy(id, true);
+
+    try {
+      const response = await fetch(`/api/projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-user-id": activeUserId },
+        body: JSON.stringify({ name, status })
+      });
+      const payload = (await response.json()) as {
+        project?: { name: string; status: string };
+        error?: string;
+      };
+
+      if (!response.ok || !payload.project) {
+        setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...previous } : p)));
+        toast({
+          title: "Couldn't save changes",
+          description: payload.error ?? "Please try again.",
+          variant: "error"
+        });
+        return "error";
+      }
+
+      toast(
+        archiving
+          ? { title: "Project archived", description: `“${name}” was archived.`, variant: "info" }
+          : { title: "Changes saved", description: `“${name}” was updated.`, variant: "success" }
+      );
+      return "ok";
+    } catch {
+      setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...previous } : p)));
+      toast({ title: "Network error", description: "Couldn't reach the server.", variant: "error" });
+      return "error";
+    } finally {
+      setBusy(id, false);
+    }
+  }
+
   return (
     <>
       <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
@@ -206,6 +255,7 @@ export function Workspace({
         busyIds={busyIds}
         loading={isSwitching}
         onChangeStatus={changeStatus}
+        onEdit={setEditing}
       />
 
       <UpgradeModal
@@ -221,6 +271,13 @@ export function Workspace({
             variant: "info"
           });
         }}
+      />
+
+      <EditProjectModal
+        open={editing !== null}
+        project={editing}
+        onClose={() => setEditing(null)}
+        onSave={saveProject}
       />
     </>
   );

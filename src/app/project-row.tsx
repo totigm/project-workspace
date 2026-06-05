@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
 import { StatusBadge } from "@/app/status-badge";
 import type { ClientProject } from "@/app/workspace";
 
@@ -16,10 +15,10 @@ type ProjectRowProps = {
   project: ClientProject;
   busy: boolean;
   onChangeStatus: (id: string, status: string) => void;
+  onEdit: (project: ClientProject) => void;
 };
 
-export function ProjectRow({ project, busy, onChangeStatus }: ProjectRowProps) {
-  const [confirmingArchive, setConfirmingArchive] = useState(false);
+export function ProjectRow({ project, busy, onChangeStatus, onEdit }: ProjectRowProps) {
   const status = project.status.toUpperCase();
   const isArchived = status === "ARCHIVED";
   const created = DATE_FMT.format(new Date(project.createdAt));
@@ -44,64 +43,30 @@ export function ProjectRow({ project, busy, onChangeStatus }: ProjectRowProps) {
 
       {/* Status + actions */}
       <div className="col-start-2 row-start-1 flex items-center justify-end gap-2 sm:col-start-3">
-        {confirmingArchive ? (
-          <motion.div
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-2"
+        <StatusBadge status={project.status} />
+        {isArchived ? (
+          <span
+            className="grid size-8 place-items-center text-subtle"
+            title="Archived projects are frozen"
+            aria-label="Archived projects are frozen"
           >
-            <span className="hidden text-[0.78rem] font-medium text-muted sm:inline">Archive?</span>
-            <button
-              type="button"
-              onClick={() => setConfirmingArchive(false)}
-              className="rounded-md px-2.5 py-1 text-[0.78rem] font-semibold text-muted transition-colors hover:bg-surface-2 hover:text-text"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setConfirmingArchive(false);
-                onChangeStatus(project.id, "ARCHIVED");
-              }}
-              className="rounded-md px-2.5 py-1 text-[0.78rem] font-semibold transition-colors"
-              style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
-            >
-              Archive
-            </button>
-          </motion.div>
+            <LockIcon />
+          </span>
         ) : (
-          <>
-            <StatusBadge status={project.status} />
-            {isArchived ? (
-              <span
-                className="grid size-8 place-items-center text-subtle"
-                title="Archived projects are frozen"
-                aria-label="Archived projects are frozen"
-              >
-                <LockIcon />
-              </span>
-            ) : (
-              <div className="flex items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-                <IconButton
-                  label={status === "ACTIVE" ? "Pause project" : "Activate project"}
-                  disabled={busy}
-                  onClick={() =>
-                    onChangeStatus(project.id, status === "ACTIVE" ? "PAUSED" : "ACTIVE")
-                  }
-                >
-                  {status === "ACTIVE" ? <PauseIcon /> : <PlayIcon />}
-                </IconButton>
-                <IconButton
-                  label="Archive project"
-                  disabled={busy}
-                  onClick={() => setConfirmingArchive(true)}
-                >
-                  <ArchiveIcon />
-                </IconButton>
-              </div>
-            )}
-          </>
+          <div className="flex items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+            <IconButton
+              label={status === "ACTIVE" ? "Pause project" : "Activate project"}
+              disabled={busy}
+              onClick={() =>
+                onChangeStatus(project.id, status === "ACTIVE" ? "PAUSED" : "ACTIVE")
+              }
+            >
+              {status === "ACTIVE" ? <PauseIcon /> : <PlayIcon />}
+            </IconButton>
+            <IconButton label="Edit project" disabled={busy} onClick={() => onEdit(project)}>
+              <EditIcon />
+            </IconButton>
+          </div>
         )}
       </div>
     </motion.li>
@@ -147,10 +112,11 @@ function PlayIcon() {
     </svg>
   );
 }
-function ArchiveIcon() {
+function EditIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M4 7h16M5 7l1 12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1l1-12M4 7l1.2-2.4A1 1 0 0 1 6.1 4h11.8a1 1 0 0 1 .9.6L20 7M10 12h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 20h4l10-10a2.1 2.1 0 0 0-3-3L5 17v3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M13.5 6.5l4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </svg>
   );
 }
