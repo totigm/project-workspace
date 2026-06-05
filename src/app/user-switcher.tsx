@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type SwitchUser = { id: string; label: string };
 
@@ -18,6 +18,10 @@ export function UserSwitcher({
   // before the server navigation resolves.
   const [selected, setSelected] = useState(activeId);
 
+  // Keep in sync when the active user changes from outside (e.g. browser
+  // back/forward), so the pill always reflects the real current user.
+  useEffect(() => setSelected(activeId), [activeId]);
+
   function select(id: string) {
     if (id === selected) return;
     setSelected(id);
@@ -26,7 +30,7 @@ export function UserSwitcher({
 
   return (
     <div
-      role="tablist"
+      role="radiogroup"
       aria-label="Switch current user"
       className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-1 p-1 shadow-sm"
     >
@@ -35,9 +39,9 @@ export function UserSwitcher({
         return (
           <button
             key={user.id}
-            role="tab"
+            role="radio"
             type="button"
-            aria-selected={isActive}
+            aria-checked={isActive}
             onClick={() => select(user.id)}
             className="relative isolate rounded-full px-4 py-1.5 text-sm font-semibold transition-colors"
             style={{ color: isActive ? "var(--accent-contrast)" : "var(--text-muted)" }}

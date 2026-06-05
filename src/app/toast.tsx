@@ -42,8 +42,16 @@ export function useToast() {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const seq = useRef(0);
+  // Track auto-dismiss timers so we can clear them on manual dismiss and when
+  // the provider unmounts (avoids firing setState on an unmounted tree).
+  const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
 
   const dismiss = useCallback((id: number) => {
+    const timer = timers.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timers.current.delete(id);
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
@@ -52,11 +60,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       const id = (seq.current += 1);
       setToasts((prev) => [...prev, { id, title, description, variant }]);
       if (duration > 0) {
-        setTimeout(() => dismiss(id), duration);
+        timers.current.set(
+          id,
+          setTimeout(() => dismiss(id), duration)
+        );
       }
     },
     [dismiss]
   );
+
+  // Clear any pending timers on unmount.
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      pending.forEach((timer) => clearTimeout(timer));
+      pending.clear();
+    };
+  }, []);
 
   const value = useMemo(() => push, [push]);
 

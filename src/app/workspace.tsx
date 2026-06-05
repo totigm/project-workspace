@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { CreateProjectForm, type CreateResult } from "@/app/create-project-form";
 import { EditProjectModal, type SaveResult } from "@/app/edit-project-modal";
 import { ProjectsPanel } from "@/app/projects-panel";
@@ -45,14 +45,16 @@ export function Workspace({
   const [editing, setEditing] = useState<ClientProject | null>(null);
   const [isSwitching, startSwitch] = useTransition();
 
-  // Re-seed from the server when the active user changes (account switch).
-  const seedRef = useRef(initialProjects);
-  seedRef.current = initialProjects;
+  // Re-seed from the server when the active user changes (account switch). The
+  // effect closes over `initialProjects` from the render where activeUserId
+  // changed, so it always matches the new user — no extra ref needed.
   useEffect(() => {
-    setProjects(seedRef.current);
+    setProjects(initialProjects);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeUserId]);
 
   const isFree = plan.toUpperCase() === "FREE";
+  const totalCount = projects.length;
   // Archived projects are a soft-delete and don't count toward the plan limit.
   const liveCount = useMemo(
     () => projects.filter((p) => p.status.toUpperCase() !== "ARCHIVED").length,
@@ -97,7 +99,7 @@ export function Workspace({
       }
 
       const payload = (await response.json()) as {
-        project?: { id: string; name: string; status: string };
+        project?: { id: string; name: string; status: string; createdAt?: string };
         error?: string;
       };
 
@@ -113,7 +115,17 @@ export function Workspace({
 
       const created = payload.project;
       setProjects((prev) =>
-        prev.map((p) => (p.id === tempId ? { ...p, id: created.id, name: created.name, status: created.status } : p))
+        prev.map((p) =>
+          p.id === tempId
+            ? {
+                ...p,
+                id: created.id,
+                name: created.name,
+                status: created.status,
+                createdAt: created.createdAt ?? p.createdAt
+              }
+            : p
+        )
       );
       toast({ title: "Project created", description: `“${created.name}” is live.`, variant: "success" });
       return "ok";
@@ -235,7 +247,7 @@ export function Workspace({
       </header>
 
       <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-[auto_1fr]">
-        <StatCard count={liveCount} />
+        <StatCard count={totalCount} />
         <div className="flex sm:justify-end">
           <PlanPill plan={plan} />
         </div>

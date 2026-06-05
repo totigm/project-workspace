@@ -99,6 +99,9 @@ export function Select({ value, options, onChange, id, ariaLabel, className }: S
       case "Escape":
         if (open) {
           event.preventDefault();
+          // Stop the event reaching an ancestor modal's Escape handler, so the
+          // first Escape only closes this dropdown (not the whole dialog).
+          event.stopPropagation();
           setOpen(false);
         }
         break;
@@ -129,7 +132,7 @@ export function Select({ value, options, onChange, id, ariaLabel, className }: S
         role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-controls={listboxId}
+        aria-controls={open ? listboxId : undefined}
         aria-label={ariaLabel}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onKeyDown}
