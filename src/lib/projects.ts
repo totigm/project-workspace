@@ -1,4 +1,4 @@
-import { BillingPlan, ProjectStatus } from "@prisma/client";
+import { BillingPlan, Prisma, ProjectStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/current-user";
 
@@ -52,21 +52,38 @@ export async function createProjectForUser(userId: string, input: CreateProjectI
   const name = parseProjectName(input.name);
   const status = parseProjectStatus(input.status);
 
-  await assertProjectLimitNotReached(currentUser.organizationId, currentUser.organization.plan);
+  return prisma.$transaction(async (tx) => {
+    // Take a per-organization advisory lock so the limit check and the insert
+    // are atomic. Without it, two concurrent creates could both read a count
+    // below the limit and both insert, pushing the org over its ceiling. The
+    // lock is scoped per org (so unrelated orgs don't serialize) and released
+    // automatically when the transaction ends.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`project-limit:${currentUser.organizationId}`}))`;
 
-  return prisma.project.create({
-    data: {
-      name,
-      status,
-      organizationId: currentUser.organizationId
-    },
-    include: {
-      organization: true
-    }
+    await assertProjectLimitNotReached(
+      tx,
+      currentUser.organizationId,
+      currentUser.organization.plan
+    );
+
+    return tx.project.create({
+      data: {
+        name,
+        status,
+        organizationId: currentUser.organizationId
+      },
+      include: {
+        organization: true
+      }
+    });
   });
 }
 
-async function assertProjectLimitNotReached(organizationId: string, plan: BillingPlan) {
+async function assertProjectLimitNotReached(
+  client: Prisma.TransactionClient,
+  organizationId: string,
+  plan: BillingPlan
+) {
   const limit = PROJECT_LIMITS[plan];
 
   if (limit === null) {
@@ -75,7 +92,7 @@ async function assertProjectLimitNotReached(organizationId: string, plan: Billin
 
   // Archived projects are a soft-delete and don't count against the plan limit —
   // only live (active/paused) projects do.
-  const activeCount = await prisma.project.count({
+  const activeCount = await client.project.count({
     where: {
       organizationId,
       status: { not: ProjectStatus.ARCHIVED }

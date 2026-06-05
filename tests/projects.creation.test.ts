@@ -163,6 +163,26 @@ describe("project creation", () => {
 
     expect(response.status).toBe(201);
   });
+
+  it("does not exceed the limit under concurrent creates (race)", async () => {
+    // Fixture has 2 live projects → exactly 1 free slot. Firing several creates
+    // at once must let through only one; the per-org advisory lock serializes
+    // the check+insert so the others see the slot is gone.
+    const responses = await Promise.all(
+      Array.from({ length: 5 }, (_, i) =>
+        requestCreateProject(fixture.user, { name: `Race ${i}` })
+      )
+    );
+    const statuses = responses.map((response) => response.status);
+
+    expect(statuses.filter((status) => status === 201)).toHaveLength(1);
+    expect(statuses.filter((status) => status === 403)).toHaveLength(4);
+
+    const liveCount = await prisma.project.count({
+      where: { organizationId: fixture.org, status: { not: ProjectStatus.ARCHIVED } }
+    });
+    expect(liveCount).toBe(3);
+  });
 });
 
 function requestCreateProject(userId: string, body: Record<string, unknown>) {

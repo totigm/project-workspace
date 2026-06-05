@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
           id: project.id,
           name: project.name,
           status: project.status,
+          createdAt: project.createdAt,
           organizationId: project.organizationId,
           organizationName: project.organization.name
         }
