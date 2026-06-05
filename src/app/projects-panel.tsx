@@ -15,6 +15,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 ];
 
 type ProjectsPanelProps = {
+  userId: string;
   projects: ClientProject[];
   busyIds: Set<string>;
   loading: boolean;
@@ -23,6 +24,7 @@ type ProjectsPanelProps = {
 };
 
 export function ProjectsPanel({
+  userId,
   projects,
   busyIds,
   loading,
@@ -176,6 +178,7 @@ export function ProjectsPanel({
             {visible.map((project) => (
               <ProjectRow
                 key={project.id}
+                userId={userId}
                 project={project}
                 busy={busyIds.has(project.id)}
                 onChangeStatus={onChangeStatus}

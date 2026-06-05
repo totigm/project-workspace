@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { StatusBadge } from "@/app/status-badge";
 import type { ClientProject } from "@/app/workspace";
@@ -12,13 +13,14 @@ const DATE_FMT = new Intl.DateTimeFormat("en-US", {
 });
 
 type ProjectRowProps = {
+  userId: string;
   project: ClientProject;
   busy: boolean;
   onChangeStatus: (id: string, status: string) => void;
   onEdit: (project: ClientProject) => void;
 };
 
-export function ProjectRow({ project, busy, onChangeStatus, onEdit }: ProjectRowProps) {
+export function ProjectRow({ userId, project, busy, onChangeStatus, onEdit }: ProjectRowProps) {
   const status = project.status.toUpperCase();
   const isArchived = status === "ARCHIVED";
   const created = DATE_FMT.format(new Date(project.createdAt));
@@ -34,7 +36,12 @@ export function ProjectRow({ project, busy, onChangeStatus, onEdit }: ProjectRow
     >
       {/* Name + (mobile) date */}
       <div className="min-w-0">
-        <p className="truncate font-semibold text-text">{project.name}</p>
+        <Link
+          href={`/projects/${project.id}?userId=${userId}`}
+          className="block truncate font-semibold text-text underline-offset-4 transition-colors hover:text-accent-ink hover:underline"
+        >
+          {project.name}
+        </Link>
         <p className="mt-0.5 text-[0.78rem] text-subtle sm:hidden">Created {created}</p>
       </div>
 

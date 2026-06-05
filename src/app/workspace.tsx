@@ -263,6 +263,7 @@ export function Workspace({
       </div>
 
       <ProjectsPanel
+        userId={activeUserId}
         projects={projects}
         busyIds={busyIds}
         loading={isSwitching}
