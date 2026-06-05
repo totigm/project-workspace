@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Reorder, useReducedMotion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SerializedTask } from "@/lib/serialize";
@@ -30,10 +30,6 @@ export function TaskBoard({ userId, projectId, initialTasks, readOnly }: TaskBoa
   const queryClient = useQueryClient();
   const reduceMotion = useReducedMotion();
   const queryKey = ["project-tasks", projectId];
-
-  // True while a within-column drag is in flight, so the cache echo from our own
-  // optimistic move/refetch doesn't yank the list mid-drag (the sync trap).
-  const dragging = useRef(false);
 
   const { data: tasks = [] } = useQuery({
     queryKey,
@@ -161,12 +157,6 @@ export function TaskBoard({ userId, projectId, initialTasks, readOnly }: TaskBoa
                   value={task}
                   className="task-card"
                   drag={!readOnly ? "y" : false}
-                  onDragStart={() => {
-                    dragging.current = true;
-                  }}
-                  onDragEnd={() => {
-                    dragging.current = false;
-                  }}
                   whileDrag={
                     reduceMotion
                       ? undefined
