@@ -199,6 +199,256 @@ button:disabled {
   font-weight: 700;
 }
 
+.form-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+/* ---------- Upgrade / limit-reached dialog ---------- */
+
+.upgrade-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 32, 0);
+  backdrop-filter: blur(0);
+  opacity: 0;
+  transition:
+    opacity 220ms ease,
+    background 260ms ease,
+    backdrop-filter 260ms ease;
+}
+
+.upgrade-overlay[data-visible="true"] {
+  background: rgba(15, 23, 32, 0.52);
+  backdrop-filter: blur(6px);
+  opacity: 1;
+}
+
+.upgrade-card {
+  position: relative;
+  width: min(100%, 432px);
+  padding: 30px 28px 26px;
+  border-radius: 20px;
+  background: var(--panel);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 30px 60px -24px rgba(15, 23, 32, 0.45),
+    0 12px 24px -18px rgba(15, 118, 110, 0.4);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(14px) scale(0.94);
+  transition:
+    opacity 240ms ease,
+    transform 320ms cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+
+/* Soft teal mesh glow anchored to the top of the card */
+.upgrade-card::before {
+  content: "";
+  position: absolute;
+  inset: -40% 20% auto;
+  height: 220px;
+  background: radial-gradient(
+    60% 100% at 50% 0%,
+    rgba(20, 184, 166, 0.28),
+    rgba(20, 184, 166, 0) 70%
+  );
+  pointer-events: none;
+}
+
+.upgrade-card[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.upgrade-grip {
+  display: none;
+}
+
+.upgrade-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.upgrade-close:hover {
+  background: #eef1f6;
+  color: var(--foreground);
+}
+
+.upgrade-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #ffffff;
+  box-shadow: 0 10px 22px -10px rgba(15, 118, 110, 0.8);
+}
+
+.upgrade-eyebrow {
+  margin: 18px 0 6px;
+  color: var(--accent-strong);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#upgrade-title {
+  margin: 0 0 10px;
+  font-size: 1.5rem;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.upgrade-desc {
+  margin: 0 0 22px;
+  color: var(--muted);
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.upgrade-meter {
+  margin-bottom: 24px;
+}
+
+.upgrade-meter-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #eef1f6;
+  overflow: hidden;
+}
+
+.upgrade-meter-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #14b8a6);
+  transition: width 720ms cubic-bezier(0.22, 1, 0.36, 1) 180ms;
+}
+
+.upgrade-meter-label {
+  display: block;
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.upgrade-meter-label strong {
+  color: var(--foreground);
+}
+
+.upgrade-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.upgrade-primary {
+  width: 100%;
+  min-height: 48px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  box-shadow: 0 12px 24px -12px rgba(15, 118, 110, 0.9);
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    filter 140ms ease;
+}
+
+.upgrade-primary:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 16px 30px -12px rgba(15, 118, 110, 0.95);
+}
+
+.upgrade-primary:active {
+  transform: scale(0.98);
+}
+
+.upgrade-secondary {
+  width: 100%;
+  min-height: 44px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.upgrade-secondary:hover {
+  background: #eef1f6;
+  color: var(--foreground);
+}
+
+/* Staggered reveal of the card's contents */
+.upgrade-icon,
+.upgrade-eyebrow,
+#upgrade-title,
+.upgrade-desc,
+.upgrade-meter,
+.upgrade-actions {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 360ms ease,
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.upgrade-card[data-visible="true"] .upgrade-icon {
+  transition-delay: 90ms;
+}
+.upgrade-card[data-visible="true"] .upgrade-eyebrow {
+  transition-delay: 140ms;
+}
+.upgrade-card[data-visible="true"] #upgrade-title {
+  transition-delay: 180ms;
+}
+.upgrade-card[data-visible="true"] .upgrade-desc {
+  transition-delay: 220ms;
+}
+.upgrade-card[data-visible="true"] .upgrade-meter {
+  transition-delay: 260ms;
+}
+.upgrade-card[data-visible="true"] .upgrade-actions {
+  transition-delay: 300ms;
+}
+
+.upgrade-card[data-visible="true"] .upgrade-icon,
+.upgrade-card[data-visible="true"] .upgrade-eyebrow,
+.upgrade-card[data-visible="true"] #upgrade-title,
+.upgrade-card[data-visible="true"] .upgrade-desc,
+.upgrade-card[data-visible="true"] .upgrade-meter,
+.upgrade-card[data-visible="true"] .upgrade-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .project-list {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -284,5 +534,58 @@ tbody tr:last-child td {
   .user-switcher a {
     flex: 1 1 0;
     text-align: center;
+  }
+
+  /* On phones the dialog becomes a bottom sheet that slides up */
+  .upgrade-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .upgrade-card {
+    width: 100%;
+    padding: 14px 22px calc(26px + env(safe-area-inset-bottom));
+    border-radius: 22px 22px 0 0;
+    transform: translateY(100%);
+    transition:
+      opacity 200ms ease,
+      transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .upgrade-card[data-visible="true"] {
+    transform: translateY(0);
+  }
+
+  .upgrade-grip {
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 0 auto 18px;
+    border-radius: 999px;
+    background: var(--line);
+  }
+
+  .upgrade-close {
+    top: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upgrade-overlay,
+  .upgrade-card,
+  .upgrade-meter-fill,
+  .upgrade-icon,
+  .upgrade-eyebrow,
+  #upgrade-title,
+  .upgrade-desc,
+  .upgrade-meter,
+  .upgrade-actions {
+    transition-duration: 1ms;
+    transition-delay: 0ms;
+  }
+
+  .upgrade-card,
+  .upgrade-card[data-visible="true"] {
+    transform: none;
   }
 }

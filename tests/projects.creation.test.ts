@@ -108,6 +108,41 @@ describe("project creation", () => {
     expect(response.status).toBe(400);
     expect(body.error).toBe("Project name is required.");
   });
+
+  it("allows free orgs to reach the 3 project limit", async () => {
+    // Fixture starts with 2 projects; the 3rd should still be allowed.
+    const response = await requestCreateProject(fixture.user, {
+      name: "Third Project"
+    });
+
+    expect(response.status).toBe(201);
+  });
+
+  it("blocks free orgs from exceeding the 3 project limit", async () => {
+    await requestCreateProject(fixture.user, { name: "Third Project" });
+
+    const response = await requestCreateProject(fixture.user, {
+      name: "Fourth Project"
+    });
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(403);
+    expect(body.error).toMatch(/limited to 3 projects/);
+  });
+
+  it("lets pro orgs create beyond the free limit", async () => {
+    await prisma.organization.update({
+      where: { id: fixture.org },
+      data: { plan: BillingPlan.PRO }
+    });
+
+    await requestCreateProject(fixture.user, { name: "Third Project" });
+    const response = await requestCreateProject(fixture.user, {
+      name: "Fourth Project"
+    });
+
+    expect(response.status).toBe(201);
+  });
 });
 
 function requestCreateProject(userId: string, body: Record<string, unknown>) {

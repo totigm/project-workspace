@@ -1,5 +1,5 @@
 import { DEFAULT_USER_ID, requireCurrentUser } from "@/lib/current-user";
-import { listProjectsForUser } from "@/lib/projects";
+import { FREE_PROJECT_LIMIT, listProjectsForUser } from "@/lib/projects";
 import { CreateProjectForm } from "@/app/create-project-form";
 
 type HomeProps = {
@@ -47,7 +47,12 @@ export default async function Home({ searchParams }: HomeProps) {
         </div>
       </section>
 
-      <CreateProjectForm userId={userId} />
+      <CreateProjectForm
+        userId={userId}
+        plan={currentUser.organization.plan}
+        projectCount={projects.length}
+        freeLimit={FREE_PROJECT_LIMIT}
+      />
 
       <section className="project-list" aria-label="Projects">
         <table>
