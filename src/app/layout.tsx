@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/app/providers";
 import { ThemeScript } from "@/app/theme-script";
 import { ToastProvider } from "@/app/toast";
 
@@ -29,7 +30,9 @@ export default function RootLayout({
     >
       <body>
         <ThemeScript />
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <Providers>{children}</Providers>
+        </ToastProvider>
       </body>
     </html>
   );

@@ -251,11 +251,9 @@ export function Workspace({
         </div>
       </header>
 
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-[auto_1fr]">
+      <div className="mb-5 flex flex-wrap items-stretch gap-3">
         <StatCard count={totalCount} />
-        <div className="flex sm:justify-end">
-          <PlanPill plan={plan} />
-        </div>
+        <PlanPill plan={plan} />
       </div>
 
       <div className="mb-5">
@@ -268,6 +266,7 @@ export function Workspace({
       </div>
 
       <ProjectsPanel
+        userId={activeUserId}
         projects={projects}
         busyIds={busyIds}
         loading={isSwitching}

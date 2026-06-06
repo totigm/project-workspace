@@ -148,6 +148,36 @@ export async function updateProjectForUser(
   });
 }
 
+export async function getProjectForUser(userId: string, projectId: string) {
+  const currentUser = await requireCurrentUser(userId);
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: {
+      organization: true,
+      tasks: { orderBy: [{ status: "asc" }, { position: "asc" }] }
+    }
+  });
+
+  if (!project || project.organizationId !== currentUser.organizationId) {
+    throw new ProjectNotFoundError("Project not found.");
+  }
+
+  return project;
+}
+
+export async function deleteProjectForUser(userId: string, projectId: string) {
+  const currentUser = await requireCurrentUser(userId);
+
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project || project.organizationId !== currentUser.organizationId) {
+    throw new ProjectNotFoundError("Project not found.");
+  }
+
+  // Tasks cascade via the schema relation.
+  return prisma.project.delete({ where: { id: projectId } });
+}
+
 function parseProjectName(value: unknown) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new InvalidProjectInputError("Project name is required.");

@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { type KeyboardEvent, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ProjectRow } from "@/app/project-row";
 import type { ClientProject } from "@/app/workspace";
 
@@ -15,6 +15,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 ];
 
 type ProjectsPanelProps = {
+  userId: string;
   projects: ClientProject[];
   busyIds: Set<string>;
   loading: boolean;
@@ -23,14 +24,21 @@ type ProjectsPanelProps = {
 };
 
 export function ProjectsPanel({
+  userId,
   projects,
   busyIds,
   loading,
   onChangeStatus,
   onEdit
 }: ProjectsPanelProps) {
-  const [filter, setFilter] = useState<Filter>("ALL");
+  const [filter, setFilter] = useState<Filter>("ACTIVE");
   const [query, setQuery] = useState("");
+  // Debounce the search so filtering doesn't run on every keystroke.
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 250);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = { ALL: projects.length, ACTIVE: 0, PAUSED: 0, ARCHIVED: 0 };
@@ -42,16 +50,16 @@ export function ProjectsPanel({
   }, [projects]);
 
   const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = debouncedQuery.trim().toLowerCase();
     return projects.filter((p) => {
       const matchesFilter = filter === "ALL" || p.status.toUpperCase() === filter;
       const matchesQuery = q === "" || p.name.toLowerCase().includes(q);
       return matchesFilter && matchesQuery;
     });
-  }, [projects, filter, query]);
+  }, [projects, filter, debouncedQuery]);
 
   const hasAny = projects.length > 0;
-  const isFiltered = filter !== "ALL" || query.trim() !== "";
+  const isFiltered = filter !== "ALL" || debouncedQuery.trim() !== "";
 
   // Roving-tabindex keyboard support for the filter group: it's a single tab
   // stop, and arrow/Home/End move between filters, applying as they go.
@@ -134,10 +142,11 @@ export function ProjectsPanel({
 
       {/* Column header (desktop) */}
       {hasAny && !loading ? (
-        <div className="hidden grid-cols-[1fr_8.5rem_auto] gap-4 px-5 pb-2 pt-3 text-[0.7rem] font-bold uppercase tracking-wider text-subtle sm:grid">
+        <div className="hidden grid-cols-[1fr_8.5rem_7rem_4.5rem] gap-4 px-5 pb-2 pt-3 text-[0.7rem] font-bold uppercase tracking-wider text-subtle sm:grid">
           <span>Project</span>
           <span>Created</span>
           <span className="text-right">Status</span>
+          <span className="sr-only">Actions</span>
         </div>
       ) : null}
 
@@ -176,6 +185,7 @@ export function ProjectsPanel({
             {visible.map((project) => (
               <ProjectRow
                 key={project.id}
+                userId={userId}
                 project={project}
                 busy={busyIds.has(project.id)}
                 onChangeStatus={onChangeStatus}
