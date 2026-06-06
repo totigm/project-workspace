@@ -410,7 +410,7 @@ function TaskCardContent({
 }: TaskCardContentProps) {
   return (
     <div
-      className="group flex items-start gap-2 rounded-[var(--radius-md)] border border-border bg-surface-2 p-3"
+      className="group flex items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface-2 p-3"
       style={dragging ? { boxShadow: "var(--shadow-lg)" } : undefined}
     >
       {!readOnly ? (

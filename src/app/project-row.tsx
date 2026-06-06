@@ -32,16 +32,30 @@ export function ProjectRow({ userId, project, busy, onChangeStatus, onEdit }: Pr
       animate={{ opacity: busy ? 0.55 : 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginTop: 0, transition: { duration: 0.2 } }}
       transition={{ type: "spring", stiffness: 380, damping: 34 }}
-      className="group grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3.5 first:border-t-0 sm:grid-cols-[1fr_8.5rem_7rem_4.5rem] sm:px-5"
+      className="group relative grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3.5 transition-colors first:border-t-0 hover:bg-surface-2/50 focus-within:bg-surface-2/40 sm:grid-cols-[1fr_8.5rem_7rem_4.5rem] sm:px-5"
     >
-      {/* Name + (mobile) date */}
+      {/* Name + (mobile) date. The Link is "stretched" (after:inset-0) so the
+          whole row is clickable; the chevron is a persistent affordance. */}
       <div className="min-w-0">
-        <Link
-          href={`/projects/${project.id}?userId=${userId}`}
-          className="block truncate font-semibold text-text underline-offset-4 transition-colors hover:text-accent-ink hover:underline"
-        >
-          {project.name}
-        </Link>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Link
+            href={`/projects/${project.id}?userId=${userId}`}
+            aria-label={`Open ${project.name}`}
+            className="truncate font-semibold text-text transition-colors after:absolute after:inset-0 after:content-[''] group-hover:text-accent-ink focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+          >
+            {project.name}
+          </Link>
+          <svg
+            className="pointer-events-none shrink-0 text-subtle transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-accent-ink"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path d="m9 6 6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
         <p className="mt-0.5 text-[0.78rem] text-subtle sm:hidden">Created {created}</p>
       </div>
 
@@ -54,7 +68,7 @@ export function ProjectRow({ userId, project, busy, onChangeStatus, onEdit }: Pr
         <div className="flex justify-end sm:col-start-3 sm:row-start-1">
           <StatusBadge status={project.status} />
         </div>
-        <div className="flex w-[4.5rem] shrink-0 items-center justify-end gap-0.5 sm:col-start-4 sm:row-start-1">
+        <div className="relative z-10 flex w-[4.5rem] shrink-0 items-center justify-end gap-0.5 sm:col-start-4 sm:row-start-1">
           {isArchived ? (
             <span
               className="grid size-8 place-items-center text-subtle"

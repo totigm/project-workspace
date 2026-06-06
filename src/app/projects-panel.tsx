@@ -31,7 +31,7 @@ export function ProjectsPanel({
   onChangeStatus,
   onEdit
 }: ProjectsPanelProps) {
-  const [filter, setFilter] = useState<Filter>("ALL");
+  const [filter, setFilter] = useState<Filter>("ACTIVE");
   const [query, setQuery] = useState("");
   // Debounce the search so filtering doesn't run on every keystroke.
   const [debouncedQuery, setDebouncedQuery] = useState("");

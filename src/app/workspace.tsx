@@ -246,7 +246,7 @@ export function Workspace({
         </div>
       </header>
 
-      <div className="mb-5 flex flex-wrap items-center gap-3">
+      <div className="mb-5 flex flex-wrap items-stretch gap-3">
         <StatCard count={totalCount} />
         <PlanPill plan={plan} />
       </div>
