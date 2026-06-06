@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Modal } from "@/app/modal";
+import { DatePicker } from "@/app/date-picker";
 import { SerializedTask } from "@/lib/serialize";
 
 export type TaskDraft = { title: string; description: string; dueDate: string };
@@ -84,15 +85,13 @@ export function TaskModal({ open, task, onClose, onSubmit }: TaskModalProps) {
         </div>
 
         <div>
-          <label htmlFor="task-due" className={LABEL}>
+          <label id="task-due-label" className={LABEL}>
             Due date
           </label>
-          <input
-            id="task-due"
-            type="date"
+          <DatePicker
+            ariaLabel="Due date"
             value={draft.dueDate}
-            onChange={(e) => setDraft((d) => ({ ...d, dueDate: e.target.value }))}
-            className={`h-11 ${FIELD}`}
+            onChange={(dueDate) => setDraft((d) => ({ ...d, dueDate }))}
           />
         </div>
 

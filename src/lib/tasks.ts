@@ -32,6 +32,7 @@ type CreateTaskInput = {
   title?: unknown;
   description?: unknown;
   dueDate?: unknown;
+  status?: unknown;
 };
 
 export async function createTaskForUser(
@@ -48,14 +49,16 @@ export async function createTaskForUser(
   const title = parseTitle(input.title);
   const description = parseDescription(input.description);
   const dueDate = parseDueDate(input.dueDate);
+  // Tasks default to TODO, but a column's "+ Add task" can target its own status.
+  const status = input.status === undefined ? TaskStatus.TODO : parseStatus(input.status);
 
-  // New tasks land at the end of the TODO column.
+  // New tasks land at the end of their column.
   const count = await prisma.task.count({
-    where: { projectId, status: TaskStatus.TODO }
+    where: { projectId, status }
   });
 
   return prisma.task.create({
-    data: { title, description, dueDate, status: TaskStatus.TODO, position: count, projectId }
+    data: { title, description, dueDate, status, position: count, projectId }
   });
 }
 

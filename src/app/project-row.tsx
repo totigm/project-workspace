@@ -32,7 +32,7 @@ export function ProjectRow({ userId, project, busy, onChangeStatus, onEdit }: Pr
       animate={{ opacity: busy ? 0.55 : 1, y: 0 }}
       exit={{ opacity: 0, height: 0, marginTop: 0, transition: { duration: 0.2 } }}
       transition={{ type: "spring", stiffness: 380, damping: 34 }}
-      className="group grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3.5 first:border-t-0 sm:grid-cols-[1fr_8.5rem_auto] sm:px-5"
+      className="group grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3.5 first:border-t-0 sm:grid-cols-[1fr_8.5rem_7rem_4.5rem] sm:px-5"
     >
       {/* Name + (mobile) date */}
       <div className="min-w-0">
@@ -48,33 +48,38 @@ export function ProjectRow({ userId, project, busy, onChangeStatus, onEdit }: Pr
       {/* Date (desktop column) */}
       <p className="hidden text-[0.82rem] text-muted sm:block">{created}</p>
 
-      {/* Status + actions */}
-      <div className="col-start-2 row-start-1 flex items-center justify-end gap-2 sm:col-start-3">
-        <StatusBadge status={project.status} />
-        {isArchived ? (
-          <span
-            className="grid size-8 place-items-center text-subtle"
-            title="Archived projects are frozen"
-            aria-label="Archived projects are frozen"
-          >
-            <LockIcon />
-          </span>
-        ) : (
-          <div className="flex items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-            <IconButton
-              label={status === "ACTIVE" ? "Pause project" : "Activate project"}
-              disabled={busy}
-              onClick={() =>
-                onChangeStatus(project.id, status === "ACTIVE" ? "PAUSED" : "ACTIVE")
-              }
+      {/* Status + actions — `sm:contents` lets these become their own aligned
+          grid columns on desktop while staying grouped on the right on mobile. */}
+      <div className="col-start-2 row-start-1 flex items-center justify-end gap-2.5 sm:contents">
+        <div className="flex justify-end sm:col-start-3 sm:row-start-1">
+          <StatusBadge status={project.status} />
+        </div>
+        <div className="flex w-[4.5rem] shrink-0 items-center justify-end gap-0.5 sm:col-start-4 sm:row-start-1">
+          {isArchived ? (
+            <span
+              className="grid size-8 place-items-center text-subtle"
+              title="Archived projects are frozen"
+              aria-label="Archived projects are frozen"
             >
-              {status === "ACTIVE" ? <PauseIcon /> : <PlayIcon />}
-            </IconButton>
-            <IconButton label="Edit project" disabled={busy} onClick={() => onEdit(project)}>
-              <EditIcon />
-            </IconButton>
-          </div>
-        )}
+              <LockIcon />
+            </span>
+          ) : (
+            <div className="flex items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+              <IconButton
+                label={status === "ACTIVE" ? "Pause project" : "Activate project"}
+                disabled={busy}
+                onClick={() =>
+                  onChangeStatus(project.id, status === "ACTIVE" ? "PAUSED" : "ACTIVE")
+                }
+              >
+                {status === "ACTIVE" ? <PauseIcon /> : <PlayIcon />}
+              </IconButton>
+              <IconButton label="Edit project" disabled={busy} onClick={() => onEdit(project)}>
+                <EditIcon />
+              </IconButton>
+            </div>
+          )}
+        </div>
       </div>
     </motion.li>
   );

@@ -1,7 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type SelectOption = {
   value: string;
@@ -19,14 +20,24 @@ type SelectProps = {
   className?: string;
 };
 
+type Position = {
+  left: number;
+  width: number;
+  top?: number;
+  bottom?: number;
+  maxHeight: number;
+};
+
 // Accessible custom listbox: keyboard nav, type-ahead, click-outside, themed to
-// match the app's inputs (no native <select> chrome).
+// match the app's inputs. The dropdown is portaled to <body> with fixed
+// positioning so it's never clipped by an ancestor modal's `overflow: hidden`.
 export function Select({ value, options, onChange, id, ariaLabel, className }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(() =>
     Math.max(0, options.findIndex((o) => o.value === value))
   );
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<Position | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const typeahead = useRef({ buffer: "", timer: 0 });
   const reactId = useId();
@@ -35,22 +46,52 @@ export function Select({ value, options, onChange, id, ariaLabel, className }: S
   const selected = options.find((o) => o.value === value) ?? options[0];
   const selectedIndex = options.findIndex((o) => o.value === value);
 
-  // Close on outside click.
+  // Measure the trigger and decide whether to drop down or up (flip when there
+  // isn't room below — e.g. a select low inside a modal).
+  const updatePosition = useCallback(() => {
+    const el = buttonRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const gap = 8;
+    const spaceBelow = window.innerHeight - r.bottom;
+    const spaceAbove = r.top;
+    const openUp = spaceBelow < 260 && spaceAbove > spaceBelow;
+    setPosition({
+      left: r.left,
+      width: r.width,
+      top: openUp ? undefined : r.bottom + gap,
+      bottom: openUp ? window.innerHeight - r.top + gap : undefined,
+      maxHeight: Math.min(256, (openUp ? spaceAbove : spaceBelow) - gap - 8)
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open, updatePosition]);
+
+  // Close on outside click — count both the trigger and the portaled list as "inside".
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (buttonRef.current?.contains(target) || listRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
 
-  // When opening, point the active option at the current selection.
   useEffect(() => {
     if (open) setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
   }, [open, selectedIndex]);
 
-  // Keep the active option scrolled into view.
   useEffect(() => {
     if (!open) return;
     const node = listRef.current?.children[activeIndex] as HTMLElement | undefined;
@@ -67,11 +108,8 @@ export function Select({ value, options, onChange, id, ariaLabel, className }: S
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
-        if (!open) {
-          setOpen(true);
-        } else {
-          setActiveIndex((i) => Math.min(options.length - 1, i + 1));
-        }
+        if (!open) setOpen(true);
+        else setActiveIndex((i) => Math.min(options.length - 1, i + 1));
         break;
       case "ArrowUp":
         event.preventDefault();
@@ -109,7 +147,6 @@ export function Select({ value, options, onChange, id, ariaLabel, className }: S
         setOpen(false);
         break;
       default:
-        // Type-ahead: jump to the first option starting with the typed string.
         if (event.key.length === 1 && /\S/.test(event.key)) {
           const ta = typeahead.current;
           window.clearTimeout(ta.timer);
@@ -124,9 +161,73 @@ export function Select({ value, options, onChange, id, ariaLabel, className }: S
     }
   }
 
+  const dropdown =
+    open && position && typeof document !== "undefined"
+      ? createPortal(
+          <AnimatePresence>
+            <motion.ul
+              ref={listRef}
+              id={listboxId}
+              role="listbox"
+              aria-activedescendant={`${listboxId}-opt-${activeIndex}`}
+              tabIndex={-1}
+              initial={{ opacity: 0, y: position.bottom ? 6 : -6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: position.bottom ? 6 : -6, scale: 0.98, transition: { duration: 0.12 } }}
+              transition={{ type: "spring", stiffness: 500, damping: 34 }}
+              className="panel fixed z-[1100] overflow-auto p-1.5"
+              style={{
+                left: position.left,
+                width: position.width,
+                top: position.top,
+                bottom: position.bottom,
+                maxHeight: position.maxHeight,
+                boxShadow: "var(--shadow-lg)"
+              }}
+            >
+              {options.map((option, index) => {
+                const isSelected = option.value === value;
+                const isActive = index === activeIndex;
+                return (
+                  <li
+                    key={option.value}
+                    id={`${listboxId}-opt-${index}`}
+                    role="option"
+                    aria-selected={isSelected}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => commit(index)}
+                    className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-sm transition-colors"
+                    style={{
+                      background: isActive ? "var(--surface-3)" : "transparent",
+                      color: "var(--text)"
+                    }}
+                  >
+                    {option.dot ? (
+                      <span
+                        aria-hidden="true"
+                        className="size-2 shrink-0 rounded-full"
+                        style={{ background: option.dot, boxShadow: `0 0 8px ${option.dot}` }}
+                      />
+                    ) : null}
+                    <span className="flex-1 truncate font-medium">{option.label}</span>
+                    {isSelected ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" style={{ color: "var(--accent-ink)" }}>
+                        <path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </motion.ul>
+          </AnimatePresence>,
+          document.body
+        )
+      : null;
+
   return (
-    <div ref={rootRef} className={`relative ${className ?? ""}`}>
+    <div className={`relative ${className ?? ""}`}>
       <button
+        ref={buttonRef}
         id={id}
         type="button"
         role="combobox"
@@ -159,57 +260,7 @@ export function Select({ value, options, onChange, id, ariaLabel, className }: S
         </motion.svg>
       </button>
 
-      <AnimatePresence>
-        {open ? (
-          <motion.ul
-            ref={listRef}
-            id={listboxId}
-            role="listbox"
-            aria-activedescendant={`${listboxId}-opt-${activeIndex}`}
-            tabIndex={-1}
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98, transition: { duration: 0.12 } }}
-            transition={{ type: "spring", stiffness: 500, damping: 34 }}
-            className="panel absolute z-50 mt-2 max-h-64 w-full overflow-auto p-1.5"
-            style={{ boxShadow: "var(--shadow-lg)" }}
-          >
-            {options.map((option, index) => {
-              const isSelected = option.value === value;
-              const isActive = index === activeIndex;
-              return (
-                <li
-                  key={option.value}
-                  id={`${listboxId}-opt-${index}`}
-                  role="option"
-                  aria-selected={isSelected}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => commit(index)}
-                  className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] px-3 py-2 text-sm transition-colors"
-                  style={{
-                    background: isActive ? "var(--surface-3)" : "transparent",
-                    color: "var(--text)"
-                  }}
-                >
-                  {option.dot ? (
-                    <span
-                      aria-hidden="true"
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ background: option.dot, boxShadow: `0 0 8px ${option.dot}` }}
-                    />
-                  ) : null}
-                  <span className="flex-1 truncate font-medium">{option.label}</span>
-                  {isSelected ? (
-                    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" style={{ color: "var(--accent-ink)" }}>
-                      <path d="M5 13l4 4L19 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  ) : null}
-                </li>
-              );
-            })}
-          </motion.ul>
-        ) : null}
-      </AnimatePresence>
+      {dropdown}
     </div>
   );
 }

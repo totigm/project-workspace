@@ -29,7 +29,7 @@ import { TaskDraft, TaskModal } from "@/app/projects/[id]/task-modal";
 
 const COLUMNS = [
   { status: "TODO", label: "Todo" },
-  { status: "DOING", label: "Doing" },
+  { status: "DOING", label: "In progress" },
   { status: "DONE", label: "Done" }
 ] as const;
 
@@ -99,16 +99,16 @@ export function TaskBoard({ userId, projectId, initialTasks, readOnly }: TaskBoa
   }, [tasks]);
 
   const [editing, setEditing] = useState<SerializedTask | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creatingStatus, setCreatingStatus] = useState<ColumnStatus | null>(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey });
 
   const createMutation = useMutation({
-    mutationFn: async (draft: TaskDraft) => {
+    mutationFn: async ({ draft, status }: { draft: TaskDraft; status: ColumnStatus }) => {
       const res = await fetch(`/api/projects/${projectId}/tasks`, {
         method: "POST",
         headers: headers(userId),
-        body: JSON.stringify(draft)
+        body: JSON.stringify({ ...draft, status })
       });
       if (!res.ok) throw new Error("create failed");
     },
@@ -249,7 +249,7 @@ export function TaskBoard({ userId, projectId, initialTasks, readOnly }: TaskBoa
           label={col.label}
           tasks={board[col.status]}
           readOnly={readOnly}
-          onAdd={col.status === "TODO" ? () => setCreating(true) : undefined}
+          onAdd={() => setCreatingStatus(col.status)}
           onEdit={setEditing}
           onDelete={(id) => deleteMutation.mutate(id)}
         />
@@ -278,19 +278,19 @@ export function TaskBoard({ userId, projectId, initialTasks, readOnly }: TaskBoa
       )}
 
       <TaskModal
-        open={creating || editing !== null}
+        open={creatingStatus !== null || editing !== null}
         task={editing}
         onClose={() => {
-          setCreating(false);
+          setCreatingStatus(null);
           setEditing(null);
         }}
         onSubmit={(draft) => {
           if (editing) {
             editMutation.mutate({ id: editing.id, draft });
           } else {
-            createMutation.mutate(draft);
+            createMutation.mutate({ draft, status: creatingStatus ?? "TODO" });
           }
-          setCreating(false);
+          setCreatingStatus(null);
           setEditing(null);
         }}
       />
@@ -417,15 +417,15 @@ function TaskCardContent({
         <button
           type="button"
           aria-label="Drag to move task"
-          className="mt-0.5 shrink-0 cursor-grab touch-none text-subtle transition-colors hover:text-muted active:cursor-grabbing"
+          className="grid size-8 shrink-0 cursor-grab touch-none place-items-center self-center rounded-md text-subtle transition-colors hover:bg-surface-3 hover:text-muted active:cursor-grabbing"
           {...dragHandleProps}
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
             <path
               d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2.5"
+              strokeWidth="3.4"
               strokeLinecap="round"
             />
           </svg>

@@ -56,6 +56,18 @@ describe("createTaskForUser", () => {
     expect(second.position).toBe(1);
   });
 
+  it("creates a task in the requested column when a status is given", async () => {
+    const todo = await createTaskForUser(f.user, f.project, { title: "T" });
+    const doing = await createTaskForUser(f.user, f.project, {
+      title: "D",
+      status: TaskStatus.DOING
+    });
+    expect(todo.status).toBe(TaskStatus.TODO);
+    expect(doing.status).toBe(TaskStatus.DOING);
+    // Position is counted per column, so the first DOING task starts at 0.
+    expect(doing.position).toBe(0);
+  });
+
   it("rejects an empty title", async () => {
     await expect(createTaskForUser(f.user, f.project, { title: "   " })).rejects.toBeInstanceOf(
       InvalidTaskInputError
